@@ -1,0 +1,35 @@
+---
+- name: Set Config for router ISP
+  hosts: ISP
+  tasks:
+#Tiến hành đặt ip cho các thiết bị.    
+    - name: Set ipv4 for interface e0/0
+      ios_l3_interface:
+        name: Ethernet0/0
+        ipv4: 10.0.1.2/24
+    - name: Set ipv4 for interface e0/1
+      ios_l3_interface:
+        name: Ethernet0/1
+        ipv4: 10.0.2.2/24
+    - name: Set ipv4 for interface e0/2
+      ios_l3_interface:
+        name: Ethernet0/2
+        ipv4: 10.0.3.2/24
+    - name: enable interface Ethernet0/0
+      ios_config:
+        parents:
+          - interface e0/0
+        lines:
+          - no shutdown
+    - name: enable interface Ethernet0/1
+      ios_config:
+        parents:
+          - interface e0/1
+        lines:
+          - no shutdown
+    - name: enable interface Ethernet0/2
+      ios_config:
+        parents:
+          - interface e0/2
+        lines:
+          - no shutdown

@@ -1,0 +1,100 @@
+---
+- name: Set config for router SaiGon
+  hosts: SaiGon
+  tasks:
+#Tiến hành đặt ip cho các thiết bị.
+    - name: Set ipv4 for interface e0/0 
+      ios_l3_interface:
+        name: Ethernet0/0
+        ipv4: 10.0.1.1/24
+    - name: Set ipv4 for interface e0/1
+      ios_l3_interface:
+        name: Ethernet0/1
+        ipv4: 192.168.1.1/24
+    - name: enable interface Ethernet0/0
+      ios_config:
+        parents:
+          - interface e0/0
+        lines:
+          - no shutdown
+    - name: enable interface Ethernet0/1
+      ios_config:
+        parents:
+          - interface e0/1
+        lines:
+          - no shutdown      
+#Cấu hình chính sách quản lý và trao đổi khóa ISAKMP
+    - name: Set policy and ISAKMP exchange key on router SaiGon
+      ios_config:
+        parents:
+          - crypto isakmp policy 10
+        lines:
+          - hash md5
+          - encryption des
+          - group 2
+          - authentication pre-share        
+#Xác định khóa cho ISAKMP và peer, ở đây chúng ta chọn peer là dãy 8 số 0 để trỏ tất cả các peer, key 0 vnpro nghĩa là khóa mã là vnpro và không mã hóa khóa đó ( số 0).   
+    - name: Define ISAKMP key and Peer
+      ios_config:
+        commands:
+          - crypto isakmp key 0 vnpro address 0.0.0.0 0.0.0.0
+#Cấu hình chính sách IPSEC bao gồm, đóng gói mã hóa theo giao thức ESP, hàm băm chọn md5 và thuật toán mã hóa DES.        
+    - name: Set IPSEC policy
+      ios_config:
+        parents:
+          - crypto ipsec transform-set VPN esp-md5-hmac esp-des
+        lines:
+          - mode transport
+#Cấu hình tiếp tục IPSEC profile ( thay thế cho crypto map)
+    - name: Set IPSEC profile
+      ios_config:
+        parents:
+          - crypto ipsec profile MYVPN
+        lines:
+          - set transform-set VPN
+#Tạo cổng Tunnel và set up các thông tin trên cổng
+    - name: Set interface Tunnel for Router SaiGon
+      ios_l3_interface:
+        name: tunnel1
+        ipv4: 172.16.1.1/24     
+    - name: Set GRE mode and IPSEC profile
+      ios_config:
+        parents:
+          - interface tunnel 1
+        lines:
+          - tunnel source e0/0
+          - tunnel mode gre multipoint
+          - tunnel protection ipsec profile MYVPN
+          - ip nhrp network-id 1
+          - ip nhrp map multicast dynamic
+          - tunnel key 123
+#Cấu hình định tuyến OSPF
+    - name: Set ospf 1 area 0 for router SaiGon
+      ios_config:
+        parents:
+          - router ospf 1
+        lines:
+          - network 192.168.1.0 0.0.0.255 area 0
+          - network 172.16.1.0 0.0.0.255 area 0
+#Chọn định tuyến trên cổng tunnel ( không cho cổng vậy lý e0/0 tham gia định tuyến)
+    - name: Set ospf for tunnel 1
+      ios_config:
+        parents:
+          - interface tunnel 1
+        lines:
+          - ip ospf network broadcast         
+#Cấu hình DHCP Server để cấp ip cho các host khi kết nối đến router Sài Gòn   
+    - name: set DHCP for router SaiGon
+      ios_config:
+        parents:
+          - ip dhcp pool SaiGon
+        lines:
+          - network 192.168.1.0 255.255.255.0
+          - default-router 192.168.1.1
+          - dns-server 8.8.8.8
+#Cấu hình default route cho router Sài Gòn       
+    - name: Set default route for router SaiGon
+      ios_config:
+        commands:
+          - ip route 0.0.0.0 0.0.0.0 10.0.1.2
+#Hoàn tất cấu hình DMVPN trên router Sài Gòn
